@@ -1,0 +1,559 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Order Up</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=DM+Mono:wght@400;500&family=Figtree:wght@400;500;600&display=swap">
+<style>
+/* Layout: a kitchen ticket rail centred on the page. Each new order prints onto the ticket; timer and buttons sit underneath. */
+:root {
+  --ground: #E3ECE5;
+  --ink: #13251C;
+  --muted: #4F645A;
+  --rule: #B7C7BC;
+  --chili: #D8321F;
+  --on-chili: #FFFFFF;
+  --mustard: #F0B429;
+  --paper: #FBFAF3;
+  --paper-ink: #1B1A16;
+  --paper-muted: #66635A;
+  --paper-rule: #D3CFBD;
+  --stamp: #C42B19;
+  --display: 'Bricolage Grotesque', 'Trebuchet MS', system-ui, sans-serif;
+  --body: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'DM Mono', ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0D1913; --ink: #E4EEE7; --muted: #9BB0A3; --rule: #2B3F34;
+    --chili: #FF6A55; --on-chili: #1B0804; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #0D1913; --ink: #E4EEE7; --muted: #9BB0A3; --rule: #2B3F34;
+  --chili: #FF6A55; --on-chili: #1B0804; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.45;
+  padding-block: 28px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+
+h1 {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: clamp(2.2rem, 7vw, 3rem);
+  line-height: 1;
+  letter-spacing: -0.025em;
+  margin: 0;
+  text-wrap: balance;
+}
+.sub { margin: 8px 0 0; color: var(--muted); }
+
+/* stations */
+.stations { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.station {
+  min-height: 52px;
+  padding: 6px 8px;
+  border: 1.5px solid var(--ink);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: 600 0.95rem/1.15 var(--body);
+  text-align: center;
+  cursor: pointer;
+}
+.station[aria-pressed="true"] { background: var(--ink); color: var(--ground); }
+.station:hover:not([aria-pressed="true"]) { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+
+.how { margin: 0; color: var(--muted); font-size: 0.95rem; max-width: 62ch; min-height: 3em; }
+
+/* ticket */
+.stage { position: relative; padding-top: 4px; }
+.rail {
+  height: 9px;
+  background: var(--ink);
+  border-radius: 5px;
+  position: relative;
+  z-index: 2;
+}
+.ticket {
+  position: relative;
+  margin: -2px 14px 0;
+  padding: 20px 22px 26px;
+  background: var(--paper);
+  color: var(--paper-ink);
+  transform: rotate(var(--tilt, 0deg));
+  transform-origin: 50% 0;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.2));
+  min-height: 320px;
+}
+.ticket::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: calc(100% - 1px);
+  height: 9px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='9'%3E%3Cpolygon points='0,0 16,0 8,9' fill='%23FBFAF3'/%3E%3C/svg%3E") repeat-x left top;
+}
+.ticket.print { animation: print 0.42s cubic-bezier(.2,.8,.3,1); }
+@keyframes print {
+  from { transform: translateY(-18px) rotate(calc(var(--tilt, 0deg) - 1deg)); opacity: 0.2; }
+  to { transform: translateY(0) rotate(var(--tilt, 0deg)); opacity: 1; }
+}
+.t-head {
+  display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  font: 500 0.75rem/1.2 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--paper-muted);
+  padding-bottom: 12px;
+  border-bottom: 1.5px dashed var(--paper-rule);
+}
+.t-body { padding-block: 18px; display: flex; flex-direction: column; gap: 14px; }
+.label {
+  font: 500 0.72rem/1.2 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--paper-muted);
+}
+.word {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: clamp(2.4rem, 12vw, 3.8rem);
+  line-height: 0.98;
+  letter-spacing: -0.03em;
+  margin: 0;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+.banned { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.banned li {
+  border: 1.5px solid var(--stamp);
+  color: var(--stamp);
+  padding: 4px 12px;
+  font-weight: 600;
+  border-radius: 3px;
+}
+.prompt {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(1.4rem, 5.4vw, 1.85rem);
+  line-height: 1.18;
+  letter-spacing: -0.01em;
+  margin: 0;
+  text-wrap: pretty;
+}
+.focus {
+  align-self: flex-start;
+  background: var(--mustard);
+  color: var(--paper-ink);
+  font: 500 0.78rem/1 var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 6px 9px;
+}
+.opts { display: flex; flex-direction: column; gap: 8px; }
+.opt {
+  display: flex; gap: 12px; align-items: baseline;
+  width: 100%;
+  text-align: left;
+  padding: 14px;
+  border: 1.5px solid var(--paper-ink);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--paper-ink);
+  font: 600 1.15rem/1.3 var(--body);
+  cursor: pointer;
+}
+.opt .k { font: 500 0.8rem/1 var(--mono); color: var(--paper-muted); flex: none; }
+.opt[aria-pressed="true"] { background: var(--mustard); }
+.opt[aria-pressed="true"] .k { color: var(--paper-ink); }
+.or {
+  display: flex; align-items: center; gap: 10px;
+  font: 500 0.75rem/1 var(--mono); letter-spacing: 0.12em; color: var(--paper-muted);
+}
+.or::before, .or::after { content: ""; flex: 1; border-top: 1.5px dashed var(--paper-rule); }
+.t-foot { border-top: 1.5px dashed var(--paper-rule); padding-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.t-foot ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 0.95rem; }
+.stamp {
+  position: absolute;
+  top: 36%; right: 8%;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: clamp(1.5rem, 7vw, 2.2rem);
+  line-height: 1.05;
+  text-align: center;
+  color: var(--stamp);
+  border: 3px solid var(--stamp);
+  padding: 6px 14px;
+  background: rgba(251, 250, 243, 0.9);
+  transform: rotate(-9deg);
+  pointer-events: none;
+}
+
+/* controls */
+.controls { display: flex; flex-direction: column; gap: 16px; margin-top: 20px; }
+.timer { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.time {
+  font: 500 clamp(2.4rem, 11vw, 3rem)/1 var(--mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  min-width: 4.4ch;
+}
+.time.urgent { color: var(--chili); }
+.presets { display: flex; gap: 6px; }
+.chip {
+  min-width: 48px; min-height: 40px;
+  border: 1.5px solid var(--rule);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: 500 0.9rem/1 var(--mono);
+  cursor: pointer;
+}
+.chip[aria-pressed="true"] { border-color: var(--ink); background: color-mix(in srgb, var(--ink) 10%, transparent); }
+.spacer { flex: 1 1 0; }
+.served { font: 500 0.9rem/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.served b { font: 800 1.6rem/1 var(--display); color: var(--ink); margin-left: 6px; letter-spacing: 0; }
+.bar { height: 6px; background: var(--rule); border-radius: 3px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--chili); transform-origin: left; transform: scaleX(1); }
+
+.btn {
+  min-height: 48px;
+  padding: 0 20px;
+  border: 1.5px solid var(--ink);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: 600 1rem/1 var(--body);
+  cursor: pointer;
+}
+.btn.primary { background: var(--chili); border-color: var(--chili); color: var(--on-chili); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn:hover:not(:disabled) { filter: brightness(1.08); }
+button:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+.row { display: flex; gap: 8px; }
+.timer-btns { display: flex; gap: 8px; }
+.actions { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; }
+.actions.single { grid-template-columns: 1fr; }
+.actions .btn { min-height: 56px; font-size: 1.1rem; }
+.hint { margin: 0; font-size: 0.82rem; color: var(--muted); }
+@media (hover: none) { .hint { display: none; } }
+@media (prefers-reduced-motion: reduce) { .ticket.print { animation: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Order Up</h1>
+    <p class="sub">A food warmer for B1 speaking. Pairs, about five minutes.</p>
+  </header>
+
+  <nav class="stations" aria-label="Choose an activity">
+    <button class="station" data-mode="describe" aria-pressed="true">Describe It</button>
+    <button class="station" data-mode="wyr" aria-pressed="false">Would You Rather</button>
+    <button class="station" data-mode="tell" aria-pressed="false">Tell Me About</button>
+  </nav>
+
+  <p class="how" id="how"></p>
+
+  <section class="stage" aria-label="Current order">
+    <div class="rail"></div>
+    <article class="ticket" id="ticket" aria-live="polite">
+      <div id="ticketBody"></div>
+      <div class="stamp" id="stamp" hidden></div>
+    </article>
+  </section>
+
+  <section class="controls">
+    <div class="timer">
+      <div class="time" id="time">1:00</div>
+      <div class="presets" id="presets" role="group" aria-label="Timer length in seconds">
+        <button class="chip" data-s="30" aria-pressed="false">30s</button>
+        <button class="chip" data-s="60" aria-pressed="true">60s</button>
+        <button class="chip" data-s="90" aria-pressed="false">90s</button>
+      </div>
+      <span class="spacer"></span>
+      <span class="served" id="served" hidden>Served<b id="tally">0</b></span>
+      <div class="timer-btns">
+        <button class="btn" id="startBtn">Start</button>
+        <button class="btn" id="resetBtn">Reset</button>
+      </div>
+    </div>
+    <div class="bar" aria-hidden="true"><i id="fill"></i></div>
+
+    <div class="actions" id="actionsDescribe">
+      <button class="btn" id="skipBtn">Skip</button>
+      <button class="btn primary" id="gotBtn">Got it</button>
+    </div>
+    <div class="actions single" id="actionsNext" hidden>
+      <button class="btn primary" id="nextBtn">Next order</button>
+    </div>
+    <p class="hint">Right arrow: next order. Space: start or pause the timer.</p>
+  </section>
+</div>
+
+<script>
+(function () {
+  var DATA = {
+    describe: [
+      { w: "spaghetti", x: ["pasta", "Italian", "tomato"] },
+      { w: "sandwich", x: ["bread", "lunch", "filling"] },
+      { w: "popcorn", x: ["cinema", "corn", "movie"] },
+      { w: "chocolate", x: ["sweet", "brown", "cocoa"] },
+      { w: "sushi", x: ["Japan", "rice", "fish"] },
+      { w: "pizza", x: ["Italy", "cheese", "slice"] },
+      { w: "omelette", x: ["eggs", "breakfast", "pan"] },
+      { w: "soup", x: ["bowl", "hot", "spoon"] },
+      { w: "ice cream", x: ["cold", "cone", "frozen"] },
+      { w: "salad", x: ["lettuce", "healthy", "green"] },
+      { w: "barbecue", x: ["grill", "meat", "sausage"] },
+      { w: "chopsticks", x: ["Asia", "rice", "wooden"] },
+      { w: "menu", x: ["restaurant", "list", "order"] },
+      { w: "waiter", x: ["restaurant", "serve", "tip"] },
+      { w: "recipe", x: ["cook", "instructions", "ingredients"] },
+      { w: "leftovers", x: ["food", "yesterday", "fridge"] },
+      { w: "vegetarian", x: ["meat", "vegetables", "eat"] },
+      { w: "hungry", x: ["eat", "food", "stomach"] },
+      { w: "spicy", x: ["hot", "chilli", "pepper"] },
+      { w: "picnic", x: ["park", "basket", "outside"] },
+      { w: "toast", x: ["bread", "breakfast", "butter"] },
+      { w: "takeaway", x: ["restaurant", "home", "box"] },
+      { w: "fridge", x: ["cold", "kitchen", "food"] },
+      { w: "meat pie", x: ["pastry", "Australian", "sauce"] },
+      { w: "lamington", x: ["cake", "coconut", "chocolate"] },
+      { w: "Vegemite", x: ["toast", "spread", "salty"] }
+    ],
+    wyr: [
+      ["Eat only your favourite food for a year", "Try a new food every single day"],
+      ["Give up chocolate forever", "Give up coffee forever"],
+      ["Cook every meal yourself", "Eat at a restaurant for every meal"],
+      ["Have breakfast for dinner every night", "Have dinner for breakfast every morning"],
+      ["Host a huge dinner party at your home", "Have a quiet dinner for two at a restaurant"],
+      ["Eat only spicy food", "Eat only sweet food"],
+      ["Be the best cook in your family", "Be the best at finding great restaurants"],
+      ["Never use a fridge again", "Never use an oven again"],
+      ["Have a personal chef at home", "Eat free at any restaurant you choose"],
+      ["Live next door to the best bakery in town", "Live next door to the best market in town"],
+      ["Eat everything with chopsticks", "Eat everything with your hands"],
+      ["Try a very strange food from another country", "Eat the same safe meal every day"]
+    ],
+    tell: [
+      { q: "Describe the best meal you have ever had. Where were you, and who was with you?", f: "Past simple", c: ["It was the best … I'd ever had.", "We were at …", "It tasted …"] },
+      { q: "What did you eat as a child that you don't eat now? Why did it change?", f: "used to", c: ["I used to eat …", "I didn't use to like …", "Now I prefer …"] },
+      { q: "Tell your partner about a time you cooked something and it went wrong.", f: "Past simple and continuous", c: ["While I was cooking, …", "Suddenly …", "In the end, …"] },
+      { q: "What food have you never tried but would love to? What stops you?", f: "Present perfect", c: ["I've never tried …", "I'd love to …", "I've always wondered …"] },
+      { q: "Who would you invite to a dinner party, living or not? What would you cook?", f: "Second conditional", c: ["If I could invite …, I would …", "I'd cook … because …"] },
+      { q: "Explain how to make a dish from your country, step by step.", f: "Sequencing", c: ["First, you …", "After that, …", "Finally, …"] },
+      { q: "How has your diet changed since you moved to Australia?", f: "Present perfect", c: ["Since I arrived, I've …", "I've started …", "I haven't … for ages"] },
+      { q: "Describe a restaurant, café or market you love. Why do you keep going back?", f: "Describing places", c: ["It's famous for …", "The atmosphere is …", "The staff are …"] },
+      { q: "What is the strangest food you have ever eaten? Would you eat it again?", f: "Present perfect", c: ["The strangest thing I've eaten is …", "It tasted like …", "I'd (never) eat it again because …"] },
+      { q: "Do you prefer cooking at home or eating out? Give reasons and examples.", f: "Giving opinions", c: ["I'd rather …", "One advantage is …", "On the other hand, …"] },
+      { q: "What food reminds you of home? Describe a memory connected to it.", f: "Memories and feelings", c: ["It reminds me of …", "Every time I eat …, I remember …"] },
+      { q: "Plan a perfect picnic for your class. What will you bring, and why?", f: "will and going to", c: ["I'll bring …", "We're going to need …", "Let's …"] }
+    ]
+  };
+
+  var MODES = {
+    describe: {
+      label: "Describe It",
+      how: "The describer faces the screen. The guesser sits with their back to it. Explain the word without saying the red words. How many orders can you serve before time runs out?",
+      useful: ["It's a kind of …", "You use it to …", "It looks like …", "It tastes …"]
+    },
+    wyr: {
+      label: "Would You Rather",
+      how: "Read both options. Choose one and give two reasons. Your partner asks one follow-up question, then you swap.",
+      useful: ["I'd rather … because …", "If I had to choose, I'd …", "The main reason is …"]
+    },
+    tell: {
+      label: "Tell Me About",
+      how: "Partner A speaks for the whole time. Partner B listens, then asks two follow-up questions. Then swap.",
+      useful: null
+    }
+  };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var mode = "describe", decks = {}, tally = 0, current = null;
+  var preset = 60, remaining = 60, running = false, done = false, endAt = 0, tick = null, audio = null;
+
+  function shuffle(n) {
+    var a = [], i, j, t;
+    for (i = 0; i < n; i++) a.push(i);
+    for (i = n - 1; i > 0; i--) { j = Math.floor(Math.random() * (i + 1)); t = a[i]; a[i] = a[j]; a[j] = t; }
+    return a;
+  }
+  function step() {
+    var n = DATA[mode].length;
+    var d = decks[mode] || (decks[mode] = { order: shuffle(n), pos: -1 });
+    d.pos++;
+    if (d.pos >= n) { d.order = shuffle(n); d.pos = 0; }
+    return d;
+  }
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function list(items) {
+    return "<ul>" + items.map(function (s) { return "<li>" + s + "</li>"; }).join("") + "</ul>";
+  }
+
+  function draw() {
+    var d = step(), n = DATA[mode].length;
+    var item = DATA[mode][d.order[d.pos]];
+    current = item;
+    var head = '<div class="t-head"><span>No. ' + pad(d.pos + 1) + " / " + pad(n) + "</span><span>" + MODES[mode].label + "</span></div>";
+    var body = "", foot = "";
+    if (mode === "describe") {
+      body = '<div class="label">Describe</div><h2 class="word">' + item.w + '</h2>' +
+        '<div class="label">Do not say</div><ul class="banned">' +
+        item.x.map(function (s) { return "<li>" + s + "</li>"; }).join("") + "</ul>";
+    } else if (mode === "wyr") {
+      body = '<div class="label">Would you rather …</div><div class="opts">' +
+        '<button class="opt" aria-pressed="false"><span class="k">A</span><span>' + item[0] + "</span></button>" +
+        '<div class="or">OR</div>' +
+        '<button class="opt" aria-pressed="false"><span class="k">B</span><span>' + item[1] + "</span></button></div>";
+    } else {
+      body = '<div class="label">Speak about</div><p class="prompt">' + item.q + '</p><span class="focus">Focus: ' + item.f + "</span>";
+    }
+    var useful = mode === "tell" ? item.c : MODES[mode].useful;
+    foot = '<div class="t-foot"><div class="label">Useful language</div>' + list(useful) + "</div>";
+    $("ticketBody").innerHTML = head + '<div class="t-body">' + body + "</div>" + foot;
+
+    var t = $("ticket");
+    t.style.setProperty("--tilt", ((Math.random() * 1.6) - 0.8).toFixed(2) + "deg");
+    t.classList.remove("print");
+    void t.offsetWidth;
+    t.classList.add("print");
+  }
+
+  /* timer */
+  function fmt(s) {
+    var c = Math.ceil(Math.max(0, s));
+    return Math.floor(c / 60) + ":" + pad(c % 60);
+  }
+  function paint() {
+    $("time").textContent = fmt(remaining);
+    $("time").classList.toggle("urgent", done || (running && remaining <= 10));
+    $("fill").style.transform = "scaleX(" + Math.max(0, remaining / preset) + ")";
+    $("startBtn").textContent = running ? "Pause" : (done ? "Again" : (remaining < preset ? "Resume" : "Start"));
+    var lock = mode === "describe" && done;
+    $("gotBtn").disabled = lock;
+    $("skipBtn").disabled = lock;
+    $("tally").textContent = tally;
+    var st = $("stamp");
+    st.hidden = !done;
+    st.textContent = mode === "describe" ? "Time! " + tally + " served" : "Time!";
+  }
+  function beep() {
+    try {
+      if (!audio) return;
+      [0, 0.28, 0.56].forEach(function (t, i) {
+        var o = audio.createOscillator(), g = audio.createGain(), s = audio.currentTime + t;
+        o.frequency.value = i === 2 ? 880 : 660;
+        o.connect(g); g.connect(audio.destination);
+        g.gain.setValueAtTime(0.0001, s);
+        g.gain.exponentialRampToValueAtTime(0.25, s + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, s + 0.22);
+        o.start(s); o.stop(s + 0.25);
+      });
+    } catch (e) {}
+  }
+  function stopTick() { if (tick) { clearInterval(tick); tick = null; } }
+  function update() {
+    remaining = (endAt - Date.now()) / 1000;
+    if (remaining <= 0) {
+      remaining = 0; running = false; done = true; stopTick(); beep();
+    }
+    paint();
+  }
+  function startTimer() {
+    try {
+      var C = window.AudioContext || window.webkitAudioContext;
+      if (C && !audio) audio = new C();
+      if (audio && audio.state === "suspended") audio.resume();
+    } catch (e) {}
+    if (done) resetTimer();
+    running = true;
+    endAt = Date.now() + remaining * 1000;
+    stopTick();
+    tick = setInterval(update, 200);
+    paint();
+  }
+  function pauseTimer() {
+    update();
+    running = false; stopTick(); paint();
+  }
+  function resetTimer() {
+    stopTick(); running = false; done = false; remaining = preset;
+    if (mode === "describe") tally = 0;
+    paint();
+  }
+  function toggleTimer() { running ? pauseTimer() : startTimer(); }
+
+  function setPreset(s) {
+    preset = s;
+    Array.prototype.forEach.call(document.querySelectorAll("#presets .chip"), function (b) {
+      b.setAttribute("aria-pressed", String(+b.getAttribute("data-s") === s));
+    });
+    resetTimer();
+  }
+
+  function setMode(m) {
+    mode = m;
+    Array.prototype.forEach.call(document.querySelectorAll(".station"), function (b) {
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-mode") === m));
+    });
+    $("how").textContent = MODES[m].how;
+    var isD = m === "describe";
+    $("actionsDescribe").hidden = !isD;
+    $("actionsNext").hidden = isD;
+    $("served").hidden = !isD;
+    tally = 0;
+    resetTimer();
+    draw();
+  }
+
+  function advance() {
+    if (mode !== "describe") { resetTimer(); }
+    else if (done) return;
+    draw();
+  }
+
+  /* events */
+  document.querySelector(".stations").addEventListener("click", function (e) {
+    var b = e.target.closest(".station");
+    if (b) setMode(b.getAttribute("data-mode"));
+  });
+  $("presets").addEventListener("click", function (e) {
+    var b = e.target.closest(".chip");
+    if (b) setPreset(+b.getAttribute("data-s"));
+  });
+  $("startBtn").addEventListener("click", toggleTimer);
+  $("resetBtn").addEventListener("click", resetTimer);
+  $("nextBtn").addEventListener("click", advance);
+  $("skipBtn").addEventListener("click", advance);
+  $("gotBtn").addEventListener("click", function () {
+    if (done) return;
+    tally++; paint(); draw();
+  });
+  $("ticket").addEventListener("click", function (e) {
+    var o = e.target.closest(".opt");
+    if (!o) return;
+    var wasOn = o.getAttribute("aria-pressed") === "true";
+    Array.prototype.forEach.call(document.querySelectorAll(".opt"), function (x) { x.setAttribute("aria-pressed", "false"); });
+    o.setAttribute("aria-pressed", String(!wasOn));
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowRight") { e.preventDefault(); advance(); }
+    else if (e.key === " " && document.activeElement === document.body) { e.preventDefault(); toggleTimer(); }
+  });
+
+  setMode("describe");
+})();
+</script>
+
+</body></html>
